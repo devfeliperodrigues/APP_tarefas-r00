@@ -1,0 +1,137 @@
+import tkinter as tk
+from tkinter import ttk
+from tkinter import messagebox
+from tkcalendar import DateEntry
+import sys
+import pymysql
+import datetime
+
+# Funções do Banco de Dados
+def criar_banco_de_dados():
+    try:
+        cursor.execute("CREATE DATABASE IF NOT EXISTS projeto")
+        print("Banco de dados criado com sucesso!")
+        connection.select_db('projeto')
+    except pymysql.Error as e:
+        print("Erro ao criar banco de dados no MySQL", e)
+        exit(1)
+
+def criar_tabela_tarefas():
+    try:
+        cursor.execute(
+            "CREATE TABLE IF NOT EXISTS tarefas (id INT AUTO_INCREMENT PRIMARY KEY, descricao VARCHAR(255), data_inicio DATE, data_fim DATE, status VARCHAR(255))")
+        print("Tabela criada com sucesso!")
+    except pymysql.Error as e:
+        print("Erro ao criar tabela no MySQL", e)
+        exit(1)
+
+# Funções de Interface Gráfica
+def adicionar_tarefa_gui():
+    descricao = entry_descricao.get()
+    data_inicio = entry_data_inicio.get()
+    data_fim = entry_data_fim.get()
+    status = entry_status.get()
+    adicionar_tarefa(descricao, data_inicio, data_fim, status)
+    atualizar_lista_tarefas()
+
+def remover_tarefas_concluidas_gui():
+    remover_tarefas_concluidas()
+    atualizar_lista_tarefas()
+
+def atualizar_lista_tarefas():
+    try:
+        cursor.execute("SELECT * FROM tarefas")
+        records = cursor.fetchall()
+        tree.delete(*tree.get_children())
+        for record in records:
+            tree.insert("", "end", values=record)
+    except pymysql.Error as e:
+        print("Erro ao buscar tarefas no MySQL", e)
+
+def adicionar_tarefa(descricao, data_inicio, data_fim, status):
+    try:
+        # Corrigindo a chamada para datetime.strptime
+        data_inicio = datetime.datetime.strptime(data_inicio, "%d/%m/%Y").strftime("%Y-%m-%d")
+        data_fim = datetime.datetime.strptime(data_fim, "%d/%m/%Y").strftime("%Y-%m-%d")
+        
+        sql = "INSERT INTO tarefas (descricao, data_inicio, data_fim, status) VALUES (%s, %s, %s, %s)"
+        values = (descricao, data_inicio, data_fim, status)
+        cursor.execute(sql, values)
+        connection.commit()
+        print("Tarefa adicionada com sucesso!")
+    except Error as e:
+        print("Erro ao adicionar tarefa ao MySQL", e)
+
+def remover_tarefas_concluidas():
+    try:
+        sql = "DELETE FROM tarefas WHERE status='concluído'"
+        cursor.execute(sql)
+        connection.commit()
+        print("Tarefas concluídas removidas com sucesso!")
+    except pymysql.Error as e:
+        print("Erro ao remover tarefas concluídas do MySQL", e)
+
+# Configuração da Interface Gráfica
+tela = tk.Tk()
+tela.title("Lista de Tarefas")
+tela.geometry("700x500")
+tela.configure(bg="#1C1C1C")  # Cor de fundo preta
+
+# Conexão com o banco de dados
+connection = pymysql.connect(host='localhost', user='root', password='+y7=2tU:e6b9')
+cursor = connection.cursor()
+
+# Criação do banco de dados e da tabela
+criar_banco_de_dados()
+criar_tabela_tarefas()
+
+# Estilo dos Widgets
+style = ttk.Style()
+style.configure("Treeview", background="#1C1C1C", foreground="white", fieldbackground="#1C1C1C")
+style.map("Treeview", background=[('selected', '#FF4500')])
+
+# Widgets
+label_descricao = tk.Label(tela, text="Descrição:", foreground="white", bg="#1C1C1C")
+label_descricao.grid(row=0, column=0, padx=10, pady=10, sticky="E")
+
+entry_descricao = tk.Entry(tela, bg="white", fg="black")
+entry_descricao.grid(row=0, column=1, padx=10, pady=10, sticky="W")
+
+label_data_inicio = tk.Label(tela, text="Data de Início:", foreground="white", bg="#1C1C1C")
+label_data_inicio.grid(row=1, column=0, padx=10, pady=10, sticky="E")
+
+entry_data_inicio = tk.Entry(tela, bg="white", fg="black")
+entry_data_inicio.grid(row=1, column=1, padx=10, pady=10, sticky="W")
+
+label_data_fim = tk.Label(tela, text="Data de Término:", foreground="white", bg="#1C1C1C")
+label_data_fim.grid(row=2, column=0, padx=10, pady=10, sticky="E")
+
+entry_data_fim = tk.Entry(tela, bg="white", fg="black")
+entry_data_fim.grid(row=2, column=1, padx=10, pady=10, sticky="W")
+
+label_status = tk.Label(tela, text="Status:", foreground="white", bg="#1C1C1C")
+label_status.grid(row=3, column=0, padx=10, pady=10, sticky="E")
+
+# Menu suspenso (dropdown) para o status
+status_options = ["A ser iniciada", "Sendo Feita", "Concluída"]
+entry_status = ttk.Combobox(tela, values=status_options, style="TCombobox")
+entry_status.grid(row=3, column=1, padx=10, pady=10, sticky="W")
+
+btn_adicionar_tarefa = tk.Button(tela, text="Adicionar Tarefa", command=adicionar_tarefa_gui, bg="#FF4500", fg="white")
+btn_adicionar_tarefa.grid(row=4, column=0, columnspan=2, pady=10)
+
+btn_remover_tarefas_concluidas = tk.Button(tela, text="Remover Tarefas Concluídas", command=remover_tarefas_concluidas_gui, bg="#FF4500", fg="white")
+btn_remover_tarefas_concluidas.grid(row=5, column=0, columnspan=2, pady=10)
+
+# Tabela
+columns = ("ID", "Descrição", "Data de Início", "Data de Término", "Status")
+tree = ttk.Treeview(tela, columns=columns, show="headings", height=10)
+for col in columns:
+    tree.heading(col, text=col)
+tree.grid(row=6, column=0, columnspan=2, pady=10)
+
+# Atualizar a lista de tarefas na GUI
+atualizar_lista_tarefas()
+
+# Executar a interface gráfica
+tela.mainloop()
